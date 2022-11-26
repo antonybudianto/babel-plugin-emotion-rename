@@ -94,11 +94,15 @@ export default function visitor({ types: t }) {
               t.path.scope.block.body.body[0].argument.callee.name = "css2";
             }
           });
-          // console.log(filterTags);
-          // console.log(">>>123", filterTags, MAP_STYLED_VARS);
           if (filterTags.length) {
             insertEmotionReact();
           }
+
+          /**
+           * Cleanups
+           */
+          MAP_CSS_LIST = {};
+          MAP_STYLED_VARS = {};
         },
       },
       ArrowFunctionExpression(path) {
