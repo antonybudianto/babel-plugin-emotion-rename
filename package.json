@@ -4,8 +4,9 @@
   "description": "Babel plugin to rename old Emotion 9 import to new Emotion 10+ import",
   "main": "lib/index",
   "scripts": {
-    "build": "babel src/. -d lib/. --ignore=spec.js",
-    "test:babel": "node -r @babel/register src/babel.spec.js",
+    "build": "babel --config-file=./babel-main.config.js src/. -d lib/. --ignore=spec.js",
+    "test:babel": "node src/index.spec.js",
+    "tmp": "babel --config-file=./babel-example.config.js examples/. -d examples-dist/.",
     "test": "npm-run-all test:*",
     "prepublish": "npm run build"
   },

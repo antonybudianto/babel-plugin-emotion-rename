@@ -73,8 +73,10 @@ const normalCss = css\`
 const abnormalCss = css\`
   color: #000; 
 \`;
+const azt = 5;
 const Cmp = styled.div\`
   \${abnormalCss}
+  width: \${azt};
   color: 'pink';
 \`;
 `,
@@ -88,8 +90,10 @@ const normalCss = css\`
 const abnormalCss = css2\`
   color: #000; 
 \`;
+const azt = 5;
 const Cmp = styled.div\`
   \${abnormalCss}
+  width: \${azt};
   color: 'pink';
 \`;
 `

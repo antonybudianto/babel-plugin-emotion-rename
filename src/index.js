@@ -40,6 +40,7 @@ export default function visitor({ types: t }) {
   let root;
   let imported = false;
   let listTags = [];
+  let filterTags = [];
   let MAP_STYLED = {};
   let emotionReactImported = false;
   const importDeclaration = buildImport();
@@ -56,25 +57,23 @@ export default function visitor({ types: t }) {
            * Only rename all css which are embedded to styled component
            * This will swap the css import from emotion/css to emotion/react
            */
-          const res = listTags.filter((t) => MAP_STYLED[t.name]);
-          res.forEach((t) => {
-            t.path.node.declarations[0].init.tag.name = "css2";
+          filterTags = listTags.filter((t) => MAP_STYLED[t.name]);
+          filterTags.forEach((t) => {
+            // t.path.node.declarations[0].init.tag.name = "css2";
+            t.path.node.declarations[0].init.callee.name = "css2";
           });
-          if (!emotionReactImported && res.length) {
+          // console.log("ver", emotionReactImported, res.length, MAP_STYLED, res);
+          if (!emotionReactImported && filterTags.length) {
             root.unshiftContainer("body", emotionReactImportDeclaration);
             emotionReactImported = true;
           }
         },
       },
       VariableDeclaration(path) {
-        // if (path.node.declarations[0].id.name === "abnormalCss") {
-        //   console.log("vd1", path.node.declarations[0].id.name);
-        //   console.log("vd2", path.node.declarations[0].init.tag.name);
-        //   console.log("vd3", path.node.declarations[0]);
-        // }
         if (
           !path.node.declarations.length ||
           !path.node.declarations[0].id ||
+          !path.node.declarations[0].init ||
           !path.node.declarations[0].init.tag
         ) {
           return;
@@ -95,7 +94,27 @@ export default function visitor({ types: t }) {
       Identifier(path, parent) {
         const type = path.parent.type;
         const nodeName = path.node.name;
-        // console.log(type, nodeName);
+        const stype = path.node.type;
+
+        if (
+          // nodeName === "abnormalCss" &&
+          type === "CallExpression" &&
+          stype === "Identifier"
+        ) {
+          const conditions = [
+            path.parent.callee.object?.name === "styled",
+            !!path.scope.bindings._taggedTemplateLiteral,
+            !!path.scope.bindings.styled,
+            !!path.scope.bindings.css,
+          ];
+          const resultCond = conditions.every((c) => c);
+
+          // console.log("\n\n\n\n====", nodeName);
+          // console.log("conditions", resultCond);
+          if (resultCond) {
+            MAP_STYLED[nodeName] = true;
+          }
+        }
 
         /**
          * Look for template literal on styled with css embed
@@ -109,7 +128,6 @@ export default function visitor({ types: t }) {
       },
       ImportDeclaration(path, state) {
         const { hasStyled, nonStyled } = getStyled(path);
-
         if (nonStyled.length) {
           path.node.specifiers = path.node.specifiers.filter(
             (s) => s.local.name !== "styled"
