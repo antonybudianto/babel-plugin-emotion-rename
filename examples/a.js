@@ -1,17 +1,17 @@
-import React from "react";
+// import styled from "react-emotion";
+// import { css } from "emotion";
+
 import styled, { css } from "react-emotion";
 
-const normalCss = css`
+export const normalCss = css`
   color: #fff;
 `;
-const BasicStyle = function BasicStyleCmp(props) {
-  return css`
-    color: #000;
-  `;
-};
-const azt = 5;
-const Cmp = styled.div`
+
+const BasicStyle = (props) => css`
+  color: #000;
+`;
+
+export const Cmp = styled.div`
   ${BasicStyle}
-  width: ${azt};
   color: "pink";
 `;

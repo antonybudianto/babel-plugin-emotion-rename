@@ -143,8 +143,10 @@ export default function visitor({ types: t }) {
         }
       },
       ImportDeclaration(path, state) {
-        const isReactEmotionImport = path.node.source.value === "react-emotion";
-        if (isReactEmotionImport) {
+        const importPackageName = path.node.source.value;
+        if (importPackageName === "emotion") {
+          path.node.source = t.stringLiteral("@emotion/css");
+        } else if (importPackageName === "react-emotion") {
           const cssLocalName = path.node.specifiers.find(
             (s) => s.imported?.name === "css"
           )?.local?.name;
@@ -161,7 +163,7 @@ export default function visitor({ types: t }) {
           STYLED_LOCAL_NAME = styledLocalName || "styled";
 
           const { hasStyled, nonStyled } = getStyled(path);
-          if (nonStyled.length && isReactEmotionImport) {
+          if (nonStyled.length) {
             path.node.specifiers = path.node.specifiers.filter(
               (s) => s.type !== "ImportDefaultSpecifier"
             );
@@ -180,13 +182,8 @@ export default function visitor({ types: t }) {
             insertEmotionStyled();
           }
 
-          REP.forEach(({ original, replacement }) => {
-            const { value } = path.node.source;
-            if (isModule(value, original)) {
-              path.node.source = source(value, original, replacement);
-            }
-          });
-        } else if (path.node.source.value === "@emotion/styled") {
+          path.node.source = t.stringLiteral("@emotion/css");
+        } else if (importPackageName === "@emotion/styled") {
           const styledDefaultNode = path.node.specifiers.find(
             (s) => s.type === "ImportDefaultSpecifier"
           );
@@ -203,6 +200,11 @@ export default function visitor({ types: t }) {
             t.isStringLiteral(node.arguments[0]) &&
             isModule(node.arguments[0].value, original)
           ) {
+            /**
+             * @TODO
+             * handle commonjs require('emotion')...
+             */
+            console.log("call-exp");
             if (
               path.scope.bindings.styled &&
               /(react-)?emotion/.test(node.arguments[0].value)
