@@ -67,10 +67,10 @@ export default function visitor({ types: t }) {
            */
           filterTags = cssList.filter((c) => MAP_STYLED_VARS[c.name] === 1);
           filterTags.forEach((t) => {
-            if (t.path.scope.block.body.body[0].argument.tag) {
+            if (t.path.scope.block.body.body[0]?.argument.tag) {
               t.path.scope.block.body.body[0].argument.tag.name = "css2";
             }
-            if (t.path.scope.block.body.body[0].argument.callee) {
+            if (t.path.scope.block.body.body[0]?.argument.callee) {
               t.path.scope.block.body.body[0].argument.callee.name = "css2";
             }
           });
@@ -85,9 +85,9 @@ export default function visitor({ types: t }) {
          * Collects all emotion `css` calls
          */
         if (
-          path.scope.block.body?.body[0].argument?.type ===
+          path.scope.block.body?.body[0]?.argument?.type ===
             "TaggedTemplateExpression" &&
-          path.scope.block.body?.body[0].argument?.tag?.name === "css"
+          path.scope.block.body?.body[0]?.argument?.tag?.name === "css"
         ) {
           cssList.push({
             name: path?.parent.id?.name,
