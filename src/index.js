@@ -39,12 +39,20 @@ export default function visitor({ types: t }) {
     t.stringLiteral(replace(value, original, replacement));
   let root;
   let imported = false;
-  let listTags = [];
   let filterTags = [];
-  let MAP_STYLED = {};
+
+  let MAP_STYLED_VARS = {};
+  let cssList = [];
   let emotionReactImported = false;
   const importDeclaration = buildImport();
   const emotionReactImportDeclaration = buildImportEmotionReact();
+
+  function insertEmotionReact() {
+    if (!emotionReactImported) {
+      root.unshiftContainer("body", emotionReactImportDeclaration);
+      emotionReactImported = true;
+    }
+  }
 
   return {
     visitor: {
@@ -57,76 +65,47 @@ export default function visitor({ types: t }) {
            * Only rename all css which are embedded to styled component
            * This will swap the css import from emotion/css to emotion/react
            */
-          filterTags = listTags.filter((t) => MAP_STYLED[t.name]);
+          filterTags = cssList.filter((c) => MAP_STYLED_VARS[c.name] === 1);
           filterTags.forEach((t) => {
-            if (t.path.node.declarations[0].init.tag) {
-              t.path.node.declarations[0].init.tag.name = "css2";
-            } else if (t.path.node.declarations[0].init.callee) {
-              t.path.node.declarations[0].init.callee.name = "css2";
+            if (t.path.scope.block.body.body[0].argument.tag) {
+              t.path.scope.block.body.body[0].argument.tag.name = "css2";
+            }
+            if (t.path.scope.block.body.body[0].argument.callee) {
+              t.path.scope.block.body.body[0].argument.callee.name = "css2";
             }
           });
-          // console.log("ver", emotionReactImported, res.length, MAP_STYLED, res);
-          if (!emotionReactImported && filterTags.length) {
-            root.unshiftContainer("body", emotionReactImportDeclaration);
-            emotionReactImported = true;
+          // console.log(">>>", filterTags, MAP_STYLED_VARS);
+          if (filterTags.length) {
+            insertEmotionReact();
           }
         },
       },
-      VariableDeclaration(path) {
+      FunctionExpression(path) {
+        /**
+         * Collects all emotion `css` calls
+         */
         if (
-          !path.node.declarations.length ||
-          !path.node.declarations[0].id ||
-          !path.node.declarations[0].init ||
-          !path.node.declarations[0].init.tag
+          path.scope.block.body?.body[0].argument?.type ===
+            "TaggedTemplateExpression" &&
+          path.scope.block.body?.body[0].argument?.tag?.name === "css"
         ) {
-          return;
-        }
-        const varName = path.node.declarations[0].id.name;
-        const tagName = path.node.declarations[0].init.tag.name;
-        if (tagName === "css" && path.scope.bindings.styled) {
-          /**
-           * Looks for every variables that call emotion css usage.
-           * Need to list all of them for now, since
-           * it cannot check the template literal reference from this callback,
-           * it needs Identifier callback for that
-           */
-          listTags.push({ name: varName, path });
-          console.log("emotion/css!!!", varName);
+          cssList.push({
+            name: path?.parent.id?.name,
+            path,
+          });
         }
       },
-      Identifier(path, parent) {
-        const type = path.parent.type;
-        const nodeName = path.node.name;
-        const stype = path.node.type;
-
-        if (
-          // nodeName === "abnormalCss" &&
-          type === "CallExpression" &&
-          stype === "Identifier"
-        ) {
-          const conditions = [
-            path.parent.callee.object?.name === "styled",
-            !!path.scope.bindings._taggedTemplateLiteral,
-            !!path.scope.bindings.styled,
-            !!path.scope.bindings.css,
-          ];
-          const resultCond = conditions.every((c) => c);
-
-          // console.log("\n\n\n\n====", nodeName);
-          // console.log("conditions", resultCond);
-          if (resultCond) {
-            MAP_STYLED[nodeName] = true;
-          }
-        }
-
-        /**
-         * Look for template literal on styled with css embed
-         */
-        if (["TemplateLiteral"].indexOf(type) !== -1) {
-          if (path.scope.bindings.styled) {
-            console.log("foundOnTemplateLiteral!!!", nodeName);
-            MAP_STYLED[nodeName] = true;
-          }
+      TaggedTemplateExpression(path) {
+        if (path.node.tag.object?.name === "styled") {
+          const templateVars = path.node.quasi.expressions
+            .map((exp) => exp.name)
+            .forEach((expName) => {
+              /**
+               * Collects all template variables as candidates.
+               */
+              MAP_STYLED_VARS[expName] = 1;
+            });
+          console.log("tmplit...", MAP_STYLED_VARS);
         }
       },
       ImportDeclaration(path, state) {
