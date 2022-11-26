@@ -59,8 +59,11 @@ export default function visitor({ types: t }) {
            */
           filterTags = listTags.filter((t) => MAP_STYLED[t.name]);
           filterTags.forEach((t) => {
-            // t.path.node.declarations[0].init.tag.name = "css2";
-            t.path.node.declarations[0].init.callee.name = "css2";
+            if (t.path.node.declarations[0].init.tag) {
+              t.path.node.declarations[0].init.tag.name = "css2";
+            } else if (t.path.node.declarations[0].init.callee) {
+              t.path.node.declarations[0].init.callee.name = "css2";
+            }
           });
           // console.log("ver", emotionReactImported, res.length, MAP_STYLED, res);
           if (!emotionReactImported && filterTags.length) {
