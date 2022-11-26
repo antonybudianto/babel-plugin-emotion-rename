@@ -94,12 +94,24 @@ export default function visitor({ types: t }) {
               t.path.scope.block.body.body[0].argument.callee.name = "css2";
             }
           });
-          console.log(filterTags);
+          // console.log(filterTags);
           // console.log(">>>123", filterTags, MAP_STYLED_VARS);
           if (filterTags.length) {
             insertEmotionReact();
           }
         },
+      },
+      ArrowFunctionExpression(path) {
+        /**
+         * Collects all emotion `css` calls
+         */
+        if (
+          path.node.body?.type === "TaggedTemplateExpression" &&
+          path.node.body?.tag?.name === CSS_LOCAL_NAME
+        ) {
+          const cssVarName = path?.parent.id?.name;
+          MAP_CSS_LIST[cssVarName] = { path };
+        }
       },
       FunctionExpression(path) {
         /**
