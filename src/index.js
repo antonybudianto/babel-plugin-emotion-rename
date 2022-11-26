@@ -12,11 +12,18 @@ function replace(value, original, replacement) {
 }
 
 function getStyled(path) {
+  if (!path.node.source.value === "react-emotion") {
+    return {
+      hasStyled: [],
+      nonStyled: [],
+    };
+  }
+
   const hasStyled = path.node.specifiers.filter(
-    (s) => s.local.name === "styled"
+    (s) => s.type === "ImportDefaultSpecifier"
   );
   const nonStyled = path.node.specifiers.filter(
-    (s) => s.local.name !== "styled"
+    (s) => s.type !== "ImportDefaultSpecifier"
   );
   return { hasStyled, nonStyled };
 }
@@ -29,6 +36,9 @@ const buildImportEmotionReact = templateBuilder(`
   import { css as css2 } from '@emotion/react';
 `);
 
+let CSS_LOCAL_NAME = "css";
+let STYLED_LOCAL_NAME = "styled";
+
 const REP = [
   { replacement: "@emotion/css", original: "emotion" },
   { replacement: "@emotion/css", original: "react-emotion" },
@@ -38,20 +48,22 @@ export default function visitor({ types: t }) {
   const source = (value, original, replacement) =>
     t.stringLiteral(replace(value, original, replacement));
   let root;
-  let imported = false;
+  let emotionStyledImported = false;
+  let emotionReactImported = false;
   let filterTags = [];
-
   let MAP_STYLED_VARS = {};
   let cssList = [];
-  let emotionReactImported = false;
-  const importDeclaration = buildImport();
+  const emotionStyledImportDeclaration = buildImport();
   const emotionReactImportDeclaration = buildImportEmotionReact();
 
   function insertEmotionReact() {
-    if (!emotionReactImported) {
-      root.unshiftContainer("body", emotionReactImportDeclaration);
-      emotionReactImported = true;
-    }
+    root.unshiftContainer("body", emotionReactImportDeclaration);
+    emotionReactImported = true;
+  }
+
+  function insertEmotionStyled() {
+    root.unshiftContainer("body", emotionStyledImportDeclaration);
+    emotionStyledImported = true;
   }
 
   return {
@@ -74,7 +86,7 @@ export default function visitor({ types: t }) {
               t.path.scope.block.body.body[0].argument.callee.name = "css2";
             }
           });
-          // console.log(">>>", filterTags, MAP_STYLED_VARS);
+          // console.log(">>>123", filterTags, MAP_STYLED_VARS);
           if (filterTags.length) {
             insertEmotionReact();
           }
@@ -87,7 +99,7 @@ export default function visitor({ types: t }) {
         if (
           path.scope.block.body?.body[0]?.argument?.type ===
             "TaggedTemplateExpression" &&
-          path.scope.block.body?.body[0]?.argument?.tag?.name === "css"
+          path.scope.block.body?.body[0]?.argument?.tag?.name === CSS_LOCAL_NAME
         ) {
           cssList.push({
             name: path?.parent.id?.name,
@@ -96,7 +108,7 @@ export default function visitor({ types: t }) {
         }
       },
       TaggedTemplateExpression(path) {
-        if (path.node.tag.object?.name === "styled") {
+        if (path.node.tag.object?.name === STYLED_LOCAL_NAME) {
           const templateVars = path.node.quasi.expressions
             .map((exp) => exp.name)
             .forEach((expName) => {
@@ -105,37 +117,58 @@ export default function visitor({ types: t }) {
                */
               MAP_STYLED_VARS[expName] = 1;
             });
-          console.log("tmplit...", MAP_STYLED_VARS);
         }
       },
       ImportDeclaration(path, state) {
-        const { hasStyled, nonStyled } = getStyled(path);
-        if (nonStyled.length) {
-          path.node.specifiers = path.node.specifiers.filter(
-            (s) => s.local.name !== "styled"
+        const isReactEmotionImport = path.node.source.value === "react-emotion";
+        if (isReactEmotionImport) {
+          const cssLocalName = path.node.specifiers.find(
+            (s) => s.imported?.name === "css"
+          )?.local?.name;
+          const styledDefaultNode = path.node.specifiers.find(
+            (s) => s.type === "ImportDefaultSpecifier"
           );
-        }
+          const styledLocalName = styledDefaultNode.local?.name;
 
-        /**
-         * if there is only exactly one default import styled
-         * e.g. import styled from 'emotion/react-emotion'
-         */
-        if (!nonStyled.length && hasStyled.length) {
-          path.node.source = t.stringLiteral("@emotion/styled");
-          return;
-        }
+          /**
+           * Anticipate custom local import name
+           * e.g import { css as csx } or import styledz from...
+           */
+          CSS_LOCAL_NAME = cssLocalName || "css";
+          STYLED_LOCAL_NAME = styledLocalName || "styled";
 
-        if (hasStyled.length && !imported) {
-          imported = true;
-          root.unshiftContainer("body", importDeclaration);
-        }
-
-        REP.forEach(({ original, replacement }) => {
-          const { value } = path.node.source;
-          if (isModule(value, original)) {
-            path.node.source = source(value, original, replacement);
+          const { hasStyled, nonStyled } = getStyled(path);
+          if (nonStyled.length && isReactEmotionImport) {
+            path.node.specifiers = path.node.specifiers.filter(
+              (s) => s.type !== "ImportDefaultSpecifier"
+            );
           }
-        });
+
+          /**
+           * if there is only exactly one default import styled
+           * e.g. import styled from 'emotion/react-emotion'
+           */
+          if (!nonStyled.length && hasStyled.length) {
+            path.node.source = t.stringLiteral("@emotion/styled");
+            return;
+          }
+
+          if (hasStyled.length) {
+            insertEmotionStyled();
+          }
+
+          REP.forEach(({ original, replacement }) => {
+            const { value } = path.node.source;
+            if (isModule(value, original)) {
+              path.node.source = source(value, original, replacement);
+            }
+          });
+        } else if (path.node.source.value === "@emotion/styled") {
+          const styledDefaultNode = path.node.specifiers.find(
+            (s) => s.type === "ImportDefaultSpecifier"
+          );
+          styledDefaultNode.local.name = STYLED_LOCAL_NAME;
+        }
       },
       CallExpression(path, state) {
         REP.forEach(({ original, replacement }) => {
