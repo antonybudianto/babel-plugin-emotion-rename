@@ -52,7 +52,8 @@ export default function visitor({ types: t }) {
   let emotionReactImported = false;
   let filterTags = [];
   let MAP_STYLED_VARS = {};
-  let cssList = [];
+  let MAP_CSS_LIST = {};
+  // let cssList = [];
   const emotionStyledImportDeclaration = buildImport();
   const emotionReactImportDeclaration = buildImportEmotionReact();
 
@@ -77,6 +78,13 @@ export default function visitor({ types: t }) {
            * Only rename all css which are embedded to styled component
            * This will swap the css import from emotion/css to emotion/react
            */
+          const cssListKeys = Object.keys(MAP_CSS_LIST);
+          const cssList = cssListKeys.map((key) => {
+            return {
+              name: key,
+              path: MAP_CSS_LIST[key].path,
+            };
+          });
           filterTags = cssList.filter((c) => MAP_STYLED_VARS[c.name] === 1);
           filterTags.forEach((t) => {
             if (t.path.scope.block.body.body[0]?.argument.tag) {
@@ -86,6 +94,7 @@ export default function visitor({ types: t }) {
               t.path.scope.block.body.body[0].argument.callee.name = "css2";
             }
           });
+          console.log(filterTags);
           // console.log(">>>123", filterTags, MAP_STYLED_VARS);
           if (filterTags.length) {
             insertEmotionReact();
@@ -101,10 +110,8 @@ export default function visitor({ types: t }) {
             "TaggedTemplateExpression" &&
           path.scope.block.body?.body[0]?.argument?.tag?.name === CSS_LOCAL_NAME
         ) {
-          cssList.push({
-            name: path?.parent.id?.name,
-            path,
-          });
+          const cssVarName = path?.parent.id?.name;
+          MAP_CSS_LIST[cssVarName] = { path };
         }
       },
       TaggedTemplateExpression(path) {
