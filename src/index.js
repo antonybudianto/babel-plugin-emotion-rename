@@ -79,6 +79,7 @@ export default function visitor({ types: t }) {
            * This will swap the css import from emotion/css to emotion/react
            */
           const cssListKeys = Object.keys(MAP_CSS_LIST);
+          // console.log(">>", cssListKeys, MAP_STYLED_VARS);
           const cssList = cssListKeys.map((key) => {
             return {
               name: key,
@@ -121,12 +122,26 @@ export default function visitor({ types: t }) {
         /**
          * Collects all emotion `css` calls
          */
+        const cssVarName = path?.parent.id?.name;
+
+        /**
+         * Handle transpiled version of emotion css call...
+         */
+        if (
+          path.scope.block.body?.body[0]?.argument?.callee?.name ===
+          CSS_LOCAL_NAME
+        ) {
+          MAP_CSS_LIST[cssVarName] = { path };
+        }
+
+        /**
+         * Handle normal css call with template expression
+         */
         if (
           path.scope.block.body?.body[0]?.argument?.type ===
             "TaggedTemplateExpression" &&
           path.scope.block.body?.body[0]?.argument?.tag?.name === CSS_LOCAL_NAME
         ) {
-          const cssVarName = path?.parent.id?.name;
           MAP_CSS_LIST[cssVarName] = { path };
         }
       },
@@ -153,7 +168,7 @@ export default function visitor({ types: t }) {
           const styledDefaultNode = path.node.specifiers.find(
             (s) => s.type === "ImportDefaultSpecifier"
           );
-          const styledLocalName = styledDefaultNode.local?.name;
+          const styledLocalName = styledDefaultNode?.local?.name;
 
           /**
            * Anticipate custom local import name
@@ -173,12 +188,15 @@ export default function visitor({ types: t }) {
            * if there is only exactly one default import styled
            * e.g. import styled from 'emotion/react-emotion'
            */
+          let a = 0;
           if (!nonStyled.length && hasStyled.length) {
+            a = 1;
             path.node.source = t.stringLiteral("@emotion/styled");
             return;
           }
 
           if (hasStyled.length) {
+            a = 2;
             insertEmotionStyled();
           }
 
@@ -187,10 +205,38 @@ export default function visitor({ types: t }) {
           const styledDefaultNode = path.node.specifiers.find(
             (s) => s.type === "ImportDefaultSpecifier"
           );
-          styledDefaultNode.local.name = STYLED_LOCAL_NAME;
+          if (!styledDefaultNode) {
+            /**
+             * Only happen on integration, default is empty!
+             * need to insert default import manually
+             */
+            path.node.specifiers.push({
+              type: "ImportDefaultSpecifier",
+              local: { type: "Identifier", name: STYLED_LOCAL_NAME },
+            });
+          } else if (styledDefaultNode.local) {
+            styledDefaultNode.local.name = STYLED_LOCAL_NAME;
+          }
         }
       },
       CallExpression(path, state) {
+        /**
+         * Collect all styled's arguments with form of styled(a, b, c, ...)
+         */
+        if (
+          path.node.callee.name === STYLED_LOCAL_NAME &&
+          path.node.arguments &&
+          path.node.arguments.length
+        ) {
+          path.parent.arguments
+            .filter((a) => a.type === "Identifier")
+            .map((a) => a.name)
+            .forEach((expName) => {
+              MAP_STYLED_VARS[expName] = 1;
+            });
+          return;
+        }
+
         REP.forEach(({ original, replacement }) => {
           const { node } = path;
           if (
@@ -204,7 +250,6 @@ export default function visitor({ types: t }) {
              * @TODO
              * handle commonjs require('emotion')...
              */
-            console.log("call-exp");
             if (
               path.scope.bindings.styled &&
               /(react-)?emotion/.test(node.arguments[0].value)
