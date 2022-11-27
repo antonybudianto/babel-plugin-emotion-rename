@@ -1,14 +1,8 @@
 import templateBuilder from "@babel/template";
 
-/* eslint-disable no-param-reassign */
 function isModule(value, original) {
   const pattern = new RegExp(`^(${original}|${original}/.*)$`);
   return pattern.test(value);
-}
-
-function replace(value, original, replacement) {
-  const pattern = new RegExp(`^${original}`);
-  return value.replace(pattern, replacement);
 }
 
 function getStyled(path) {
@@ -45,26 +39,19 @@ const REP = [
 ];
 
 export default function visitor({ types: t }) {
-  const source = (value, original, replacement) =>
-    t.stringLiteral(replace(value, original, replacement));
   let root;
-  let emotionStyledImported = false;
-  let emotionReactImported = false;
   let filterTags = [];
   let MAP_STYLED_VARS = {};
   let MAP_CSS_LIST = {};
-  // let cssList = [];
   const emotionStyledImportDeclaration = buildImport();
   const emotionReactImportDeclaration = buildImportEmotionReact();
 
   function insertEmotionReact() {
     root.unshiftContainer("body", emotionReactImportDeclaration);
-    emotionReactImported = true;
   }
 
   function insertEmotionStyled() {
     root.unshiftContainer("body", emotionStyledImportDeclaration);
-    emotionStyledImported = true;
   }
 
   return {
@@ -73,7 +60,7 @@ export default function visitor({ types: t }) {
         enter(path) {
           root = path;
         },
-        exit(path) {
+        exit() {
           /**
            * Only rename all css which are embedded to styled component
            * This will swap the css import from emotion/css to emotion/react
@@ -147,7 +134,7 @@ export default function visitor({ types: t }) {
       },
       TaggedTemplateExpression(path) {
         if (path.node.tag.object?.name === STYLED_LOCAL_NAME) {
-          const templateVars = path.node.quasi.expressions
+          path.node.quasi.expressions
             .map((exp) => exp.name)
             .forEach((expName) => {
               /**
@@ -157,7 +144,7 @@ export default function visitor({ types: t }) {
             });
         }
       },
-      ImportDeclaration(path, state) {
+      ImportDeclaration(path) {
         const importPackageName = path.node.source.value;
         if (importPackageName === "emotion") {
           path.node.source = t.stringLiteral("@emotion/css");
@@ -188,15 +175,12 @@ export default function visitor({ types: t }) {
            * if there is only exactly one default import styled
            * e.g. import styled from 'emotion/react-emotion'
            */
-          let a = 0;
           if (!nonStyled.length && hasStyled.length) {
-            a = 1;
             path.node.source = t.stringLiteral("@emotion/styled");
             return;
           }
 
           if (hasStyled.length) {
-            a = 2;
             insertEmotionStyled();
           }
 
@@ -219,7 +203,7 @@ export default function visitor({ types: t }) {
           }
         }
       },
-      CallExpression(path, state) {
+      CallExpression(path) {
         /**
          * Collect all styled's arguments with form of styled(a, b, c, ...)
          */
@@ -237,7 +221,7 @@ export default function visitor({ types: t }) {
           return;
         }
 
-        REP.forEach(({ original, replacement }) => {
+        REP.forEach(({ original }) => {
           const { node } = path;
           if (
             node.callee.name === "require" &&
