@@ -5,6 +5,8 @@
 
 > Automatically rename legacy emotion imports to new supported emotion versions
 
+[Demo repository with Webpack+Babel+React+Emotion11](https://github.com/antonybudianto/demo-emotion)
+
 ## How it works
 
 - Scan all imports, try to rename legacy import from `emotion` / `react-emotion` to `@emotion/css`
@@ -15,6 +17,7 @@
 
 - Legacy v9 to v11
 - Some things may not be working, please checkout with caution!
+- If you're using SSR, It's very recommended to also implement `@emotion/css` SSR integration as well for smoother migration
 
 ## Install
 
