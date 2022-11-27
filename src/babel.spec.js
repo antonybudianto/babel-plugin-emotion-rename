@@ -76,42 +76,41 @@ const BasicStyle = function BasicStyleCmp(props) {
   \`;
 };
 
-const azt = 5;
-const Cmp = styled.div\`
+export const Cmp = styled.div\`
   \${BasicStyle}
-  width: \${azt};
-  color: 'pink';
+  color: "pink";
 \`;
+
+const SuperStyle = function SuperStyle(props) {
+  return css(props.size, "style");
+};
+
+export const Text = styled("div", {
+  target: "evxom8o1",
+})(SuperStyle, ";> span{outline:none;}");
+
 `,
   `
-import { css as css2 } from '@emotion/react';
+import { css as css2 } from "@emotion/react";
 import styled from "@emotion/styled";
 import { css } from "@emotion/css";
 const normalCss = css\`
   color: #fff; 
 \`;
-
 const BasicStyle = function BasicStyleCmp(props) {
   return css2\`
     color: #000;
   \`;
 };
-
-const azt = 5;
-const Cmp = styled.div\`
+export const Cmp = styled.div\`
   \${BasicStyle}
-  width: \${azt};
-  color: 'pink';
+  color: "pink";
 \`;
-`
-);
-
-testGeneration(
-  "dont replace require without binding",
-  `
-  var _emotion = _interopRequireWildcard(require("emotion"));
-  `,
-  `
-  var _emotion = _interopRequireWildcard(require("emotion"));
+const SuperStyle = function SuperStyle(props) {
+  return css2(props.size, "style");
+};
+export const Text = styled("div", {
+  target: "evxom8o1"
+})(SuperStyle, ";> span{outline:none;}");
 `
 );

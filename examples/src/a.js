@@ -2,7 +2,6 @@
 // import { css } from "emotion";
 
 import styledz, { css } from "react-emotion";
-// import { css } from "@emotion/react";
 
 export const normalCss = css`
   color: #fff;
@@ -10,17 +9,18 @@ export const normalCss = css`
 
 const BasicStyle = (props) => css`
   color: #000;
+  font-size: ${props.fontSize};
 `;
-
-var SuperStyle = function SuperStyle(props) {
-  return css(focusStyle, _ref21);
-};
-
-export var Text = styledz("div", {
-  target: "evxom8o1",
-})(SuperStyle, ";> span{outline:none;}");
 
 export const Cmp = styledz.div`
   ${BasicStyle}
   color: "pink";
 `;
+
+const SuperStyle = function SuperStyle(props) {
+  return css(props.size, "style");
+};
+
+export const Text = styledz("div", {
+  target: "evxom8o1",
+})(SuperStyle, ";> span{outline:none;}");

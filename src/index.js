@@ -23,11 +23,11 @@ function getStyled(path) {
 }
 
 const buildImport = templateBuilder(`
-  import styled from '@emotion/styled';
+  import styled from "@emotion/styled";
 `);
 
 const buildImportEmotionReact = templateBuilder(`
-  import { css as css2 } from '@emotion/react';
+  import { css as css2 } from "@emotion/react";
 `);
 
 let CSS_LOCAL_NAME = "css";

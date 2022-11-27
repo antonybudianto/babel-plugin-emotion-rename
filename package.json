@@ -6,7 +6,7 @@
   "scripts": {
     "build": "babel --config-file=./babel-main.config.js src/. -d lib/. --ignore=spec.js",
     "test:babel": "node src/index.spec.js",
-    "tmp": "babel --config-file=./babel-example.config.js examples/. -d examples-dist/.",
+    "tmp": "babel --config-file=./babel-example.config.js examples/src/. -d examples/out/.",
     "test": "npm-run-all test:*",
     "prepublish": "npm run build"
   },
