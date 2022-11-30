@@ -1,12 +1,13 @@
 import templateBuilder from "@babel/template";
+import type { Path, Tag } from "./types";
 
 function isModule(value, original) {
   const pattern = new RegExp(`^(${original}|${original}/.*)$`);
   return pattern.test(value);
 }
 
-function getStyled(path) {
-  if (!path.node.source.value === "react-emotion") {
+function getStyled(path: Path) {
+  if (path.node.source.value !== "react-emotion") {
     return {
       hasStyled: [],
       nonStyled: [],
@@ -40,7 +41,7 @@ const REP = [
 
 export default function visitor({ types: t }) {
   let root;
-  let filterTags = [];
+  let filterTags: Tag[] = [];
   let MAP_STYLED_VARS = {};
   let MAP_CSS_LIST = {};
   const emotionStyledImportDeclaration = buildImport();

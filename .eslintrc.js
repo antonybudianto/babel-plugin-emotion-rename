@@ -5,9 +5,6 @@ module.exports = {
     es2021: true,
   },
   overrides: [],
-  parserOptions: {
-    ecmaVersion: "latest",
-    sourceType: "module",
-  },
+  parser: "@typescript-eslint/parser",
   rules: {},
 };

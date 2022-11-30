@@ -1,6 +1,7 @@
 // import styled from "react-emotion";
 // import { css } from "emotion";
 
+// @ts-expect-error example only, don't install for real here
 import styledz, { css } from "react-emotion";
 
 export const normalCss = css`
