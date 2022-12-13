@@ -67,15 +67,20 @@ export default function visitor({ types: t }) {
            * This will swap the css import from emotion/css to emotion/react
            */
           const cssListKeys = Object.keys(MAP_CSS_LIST);
-          // console.log(">>", cssListKeys, MAP_STYLED_VARS);
+          console.log(">>", cssListKeys, MAP_STYLED_VARS);
           const cssList = cssListKeys.map((key) => {
             return {
               name: key,
               path: MAP_CSS_LIST[key].path,
+              _type: MAP_CSS_LIST[key]._type,
             };
           });
           filterTags = cssList.filter((c) => MAP_STYLED_VARS[c.name] === 1);
           filterTags.forEach((t) => {
+            if (t._type === "callee") {
+              t.path.node.callee.name = "css2";
+              return;
+            }
             if (t.path.scope.block.body.body[0]?.argument.tag) {
               t.path.scope.block.body.body[0].argument.tag.name = "css2";
             }
@@ -134,6 +139,11 @@ export default function visitor({ types: t }) {
         }
       },
       TaggedTemplateExpression(path) {
+        // if (path.node.tag?.name === CSS_LOCAL_NAME) {
+        //   if (path?.parent?.id?.type === "Identifier") {
+        //     MAP_CSS_LIST[path?.parent?.id.name] = 1;
+        //   }
+        // }
         if (path.node.tag.object?.name === STYLED_LOCAL_NAME) {
           path.node.quasi.expressions
             .map((exp) => exp.name)
@@ -218,6 +228,26 @@ export default function visitor({ types: t }) {
             .map((a) => a.name)
             .forEach((expName) => {
               MAP_STYLED_VARS[expName] = 1;
+            });
+          return;
+        }
+
+        if (
+          path.node.callee.name === CSS_LOCAL_NAME &&
+          path.node.arguments &&
+          path.node.arguments.length
+        ) {
+          if (path.parent?.id?.type === "Identifier") {
+            MAP_CSS_LIST[path.parent?.id?.name] = { _type: "callee", path };
+          }
+          path.node.arguments
+            .filter((a) => a.type === "Identifier")
+            .map((a) => a.name)
+            .forEach((expName) => {
+              if (MAP_CSS_LIST[expName]) {
+                MAP_STYLED_VARS[expName] = 1;
+                console.log("css within css --->", expName);
+              }
             });
           return;
         }

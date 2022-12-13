@@ -22,6 +22,9 @@ export interface Path {
     };
   };
   node: {
+    callee: {
+      name: string;
+    };
     specifiers: Specifier[];
     source: {
       value: string;
@@ -30,6 +33,7 @@ export interface Path {
 }
 
 export interface Tag {
+  _type: string;
   name: string;
   path: Path;
 }
