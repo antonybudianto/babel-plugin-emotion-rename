@@ -7,7 +7,10 @@ function isModule(value, original) {
 }
 
 function getStyled(path: Path) {
-  if (path.node.source.value !== "react-emotion") {
+  if (
+    path.node.source.value !== "react-emotion" &&
+    path.node.source.value !== "emotion"
+  ) {
     return {
       hasStyled: [],
       nonStyled: [],
@@ -67,7 +70,7 @@ export default function visitor({ types: t }) {
            * This will swap the css import from emotion/css to emotion/react
            */
           const cssListKeys = Object.keys(MAP_CSS_LIST);
-          console.log(">>", cssListKeys, MAP_STYLED_VARS);
+          // console.log(">>", cssListKeys, MAP_STYLED_VARS);
           const cssList = cssListKeys.map((key) => {
             return {
               name: key,
@@ -159,7 +162,10 @@ export default function visitor({ types: t }) {
         const importPackageName = path.node.source.value;
         if (importPackageName === "emotion") {
           path.node.source = t.stringLiteral("@emotion/css");
-        } else if (importPackageName === "react-emotion") {
+        } else if (
+          importPackageName === "react-emotion" ||
+          importPackageName == "emotion"
+        ) {
           const cssLocalName = path.node.specifiers.find(
             (s) => s.imported?.name === "css"
           )?.local?.name;
@@ -265,13 +271,15 @@ export default function visitor({ types: t }) {
              * @TODO
              * handle commonjs require('emotion')...
              */
-            if (
-              path.scope.bindings.styled &&
-              /(react-)?emotion/.test(node.arguments[0].value)
-            ) {
-              path.node.arguments = [t.stringLiteral("@emotion/styled")];
-              return;
-            }
+            // if (
+            //   path.scope.bindings.styled &&
+            //   /(react-)?emotion/.test(node.arguments[0].value)
+            // ) {
+            //   path.node.arguments = [t.stringLiteral("@emotion/styled")];
+            //   return;
+            // }
+
+            path.node.arguments = [t.stringLiteral("@emotion/css")];
 
             // path.node.arguments = [
             //   source(node.arguments[0].value, original, replacement),
