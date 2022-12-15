@@ -19,6 +19,10 @@
 - Some things may not be working, please checkout with caution!
 - If you're using SSR, It's very recommended to also implement `@emotion/css` SSR integration as well for smoother migration
 
+### Known issues:
+
+- If you import a variable from another file, and that variable is used within styled/css tagged template literal, then it's currently impossible to statically analyze and rename the import
+
 ## Install
 
 ```

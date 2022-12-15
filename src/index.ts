@@ -86,6 +86,15 @@ export default function visitor({ types: t }) {
             if (!cssArgs.length) {
               return;
             }
+
+            /**
+             * if css var is within an anon function
+             */
+            if (MAP_CSS_LIST[cssName]) {
+              if (MAP_CSS_LIST[cssName].path.node?.tag) {
+                MAP_CSS_LIST[cssName].path.node.tag.name = "css2";
+              }
+            }
             cssArgs.forEach((arg) => {
               if (ALL_CSS_NAMES[cssName][arg] === 1) {
                 MAP_STYLED_VARS[arg] = 1;
@@ -129,6 +138,7 @@ export default function visitor({ types: t }) {
             insertEmotionReact();
           }
 
+          // console.log(">>", MAP_STYLED_VARS);
           /**
            * Cleanups
            */
@@ -178,7 +188,20 @@ export default function visitor({ types: t }) {
         }
       },
       TaggedTemplateExpression(path) {
-        if (path.node.tag.object?.name === STYLED_LOCAL_NAME) {
+        if (path.node?.tag?.name === CSS_LOCAL_NAME) {
+          const taggedCssVarName =
+            path?.parentPath?.scope?.path?.container?.id?.name;
+          if (!taggedCssVarName) {
+            return;
+          }
+          const taggedVars = path.node.quasi.expressions
+            .filter((exp) => exp.type === "Identifier")
+            .map((exp) => exp.name);
+          const taggedMap = taggedVars.reduce((a, c) => ({ ...a, [c]: 1 }), {});
+
+          MAP_CSS_LIST[taggedCssVarName] = { path, _type: "tte" };
+          ALL_CSS_NAMES[taggedCssVarName] = taggedMap;
+        } else if (path.node.tag.object?.name === STYLED_LOCAL_NAME) {
           const taggedStyledVars = path.node.quasi.expressions
             .filter((exp) => exp.type === "Identifier")
             .map((exp) => exp.name);
