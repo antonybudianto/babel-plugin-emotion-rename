@@ -47,6 +47,8 @@ export default function visitor({ types: t }) {
   let filterTags: Tag[] = [];
   let MAP_STYLED_VARS = {};
   let MAP_CSS_LIST = {};
+  let ALL_STYLED_NAMES = {};
+  let ALL_CSS_NAMES = {};
   const emotionStyledImportDeclaration = buildImport();
   const emotionReactImportDeclaration = buildImportEmotionReact();
 
@@ -70,7 +72,39 @@ export default function visitor({ types: t }) {
            * This will swap the css import from emotion/css to emotion/react
            */
           const cssListKeys = Object.keys(MAP_CSS_LIST);
-          // console.log(">>", cssListKeys, MAP_STYLED_VARS);
+          // console.log(`
+          //   ${JSON.stringify(ALL_STYLED_NAMES, null, 2)}
+          //   =====
+          //   ${JSON.stringify(ALL_CSS_NAMES, null, 2)}
+          // `);
+
+          const traverseCss = (cssName) => {
+            if (!ALL_CSS_NAMES[cssName]) {
+              return;
+            }
+            let cssArgs = Object.keys(ALL_CSS_NAMES[cssName]);
+            if (!cssArgs.length) {
+              return;
+            }
+            cssArgs.forEach((arg) => {
+              if (ALL_CSS_NAMES[cssName][arg] === 1) {
+                MAP_STYLED_VARS[arg] = 1;
+                traverseCss(arg);
+              }
+            });
+          };
+
+          /**
+           * Iterate all styled and recursively rename css import
+           */
+          const styledKeys = Object.keys(ALL_STYLED_NAMES);
+          styledKeys.map((k) => {
+            const idsKeys = Object.keys(ALL_STYLED_NAMES[k]);
+            idsKeys.forEach((id) => {
+              traverseCss(id);
+            });
+          });
+
           const cssList = cssListKeys.map((key) => {
             return {
               name: key,
@@ -100,6 +134,8 @@ export default function visitor({ types: t }) {
            */
           MAP_CSS_LIST = {};
           MAP_STYLED_VARS = {};
+          ALL_STYLED_NAMES = {};
+          ALL_CSS_NAMES = {};
         },
       },
       ArrowFunctionExpression(path) {
@@ -142,20 +178,25 @@ export default function visitor({ types: t }) {
         }
       },
       TaggedTemplateExpression(path) {
-        // if (path.node.tag?.name === CSS_LOCAL_NAME) {
-        //   if (path?.parent?.id?.type === "Identifier") {
-        //     MAP_CSS_LIST[path?.parent?.id.name] = 1;
-        //   }
-        // }
         if (path.node.tag.object?.name === STYLED_LOCAL_NAME) {
-          path.node.quasi.expressions
-            .map((exp) => exp.name)
-            .forEach((expName) => {
-              /**
-               * Collects all template variables as candidates.
-               */
-              MAP_STYLED_VARS[expName] = 1;
-            });
+          const taggedStyledVars = path.node.quasi.expressions
+            .filter((exp) => exp.type === "Identifier")
+            .map((exp) => exp.name);
+          const taggedStyledIdsMap = taggedStyledVars.reduce(
+            (a, c) => ({ ...a, [c]: 1 }),
+            {}
+          );
+          const taggedStyledName = path?.parentPath?.node?.id?.name;
+          if (taggedStyledName) {
+            ALL_STYLED_NAMES[taggedStyledName] = taggedStyledIdsMap;
+          }
+
+          taggedStyledVars.forEach((expName) => {
+            /**
+             * Collects all template variables as candidates.
+             */
+            MAP_STYLED_VARS[expName] = 1;
+          });
         }
       },
       ImportDeclaration(path) {
@@ -229,12 +270,20 @@ export default function visitor({ types: t }) {
           path.node.arguments &&
           path.node.arguments.length
         ) {
-          path.parent.arguments
+          const styledVarName = path?.parentPath?.parent?.id?.name;
+          const styledIdsList = path.parent.arguments
             .filter((a) => a.type === "Identifier")
-            .map((a) => a.name)
-            .forEach((expName) => {
-              MAP_STYLED_VARS[expName] = 1;
-            });
+            .map((a) => a.name);
+          const styledIdsMap = styledIdsList.reduce(
+            (a, c) => ({ ...a, [c]: 1 }),
+            {}
+          );
+          if (styledVarName) {
+            ALL_STYLED_NAMES[styledVarName] = styledIdsMap;
+          }
+          styledIdsList.forEach((expName) => {
+            MAP_STYLED_VARS[expName] = 1;
+          });
           return;
         }
 
@@ -243,47 +292,37 @@ export default function visitor({ types: t }) {
           path.node.arguments &&
           path.node.arguments.length
         ) {
+          const cssIdsList = path.node.arguments
+            .filter((a) => a.type === "Identifier")
+            .map((a) => a.name);
+          const cssIdsMap = cssIdsList.reduce((a, c) => ({ ...a, [c]: 1 }), {});
+          const fnName = path?.parentPath?.scope?.block?.id?.name;
+          if (path.parent.type === "ReturnStatement" && fnName) {
+            ALL_CSS_NAMES[fnName] = cssIdsMap;
+            return;
+          }
+          const cssVarName = path.parent?.id?.name;
+          if (cssVarName) {
+            ALL_CSS_NAMES[cssVarName] = cssIdsMap;
+          }
           if (path.parent?.id?.type === "Identifier") {
             MAP_CSS_LIST[path.parent?.id?.name] = { _type: "callee", path };
           }
-          path.node.arguments
-            .filter((a) => a.type === "Identifier")
-            .map((a) => a.name)
-            .forEach((expName) => {
-              if (MAP_CSS_LIST[expName]) {
-                MAP_STYLED_VARS[expName] = 1;
-                console.log("css within css --->", expName);
-              }
-            });
           return;
         }
 
+        /**
+         * Handle rename require('emotion') -> require('@emotion/css')
+         */
+        const { node } = path;
+        const isRequire =
+          node.callee.name === "require" &&
+          node.arguments &&
+          node.arguments.length === 1 &&
+          t.isStringLiteral(node.arguments[0]);
         REP.forEach(({ original }) => {
-          const { node } = path;
-          if (
-            node.callee.name === "require" &&
-            node.arguments &&
-            node.arguments.length === 1 &&
-            t.isStringLiteral(node.arguments[0]) &&
-            isModule(node.arguments[0].value, original)
-          ) {
-            /**
-             * @TODO
-             * handle commonjs require('emotion')...
-             */
-            // if (
-            //   path.scope.bindings.styled &&
-            //   /(react-)?emotion/.test(node.arguments[0].value)
-            // ) {
-            //   path.node.arguments = [t.stringLiteral("@emotion/styled")];
-            //   return;
-            // }
-
+          if (isRequire && isModule(node.arguments[0].value, original)) {
             path.node.arguments = [t.stringLiteral("@emotion/css")];
-
-            // path.node.arguments = [
-            //   source(node.arguments[0].value, original, replacement),
-            // ];
           }
         });
       },
