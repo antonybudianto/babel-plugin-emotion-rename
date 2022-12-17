@@ -1,11 +1,6 @@
 import templateBuilder from "@babel/template";
 import type { Path, Tag } from "./types";
 
-function isModule(value, original) {
-  const pattern = new RegExp(`^(${original}|${original}/.*)$`);
-  return pattern.test(value);
-}
-
 function getStyled(path: Path) {
   if (
     path.node.source.value !== "react-emotion" &&
@@ -26,7 +21,7 @@ function getStyled(path: Path) {
   return { hasStyled, nonStyled };
 }
 
-const buildImport = templateBuilder(`
+const buildImportEmotionStyled = templateBuilder(`
   import styled from "@emotion/styled";
 `);
 
@@ -37,11 +32,6 @@ const buildImportEmotionReact = templateBuilder(`
 let CSS_LOCAL_NAME = "css";
 let STYLED_LOCAL_NAME = "styled";
 
-const REP = [
-  { replacement: "@emotion/css", original: "emotion" },
-  { replacement: "@emotion/css", original: "react-emotion" },
-];
-
 export default function visitor({ types: t }) {
   let root;
   let filterTags: Tag[] = [];
@@ -49,7 +39,7 @@ export default function visitor({ types: t }) {
   let MAP_CSS_LIST = {};
   let ALL_STYLED_NAMES = {};
   let ALL_CSS_NAMES = {};
-  const emotionStyledImportDeclaration = buildImport();
+  const emotionStyledImportDeclaration = buildImportEmotionStyled();
   const emotionReactImportDeclaration = buildImportEmotionReact();
 
   function insertEmotionReact() {
@@ -82,7 +72,7 @@ export default function visitor({ types: t }) {
             if (!ALL_CSS_NAMES[cssName]) {
               return;
             }
-            let cssArgs = Object.keys(ALL_CSS_NAMES[cssName]);
+            const cssArgs = Object.keys(ALL_CSS_NAMES[cssName]);
             if (!cssArgs.length) {
               return;
             }
@@ -294,7 +284,7 @@ export default function visitor({ types: t }) {
           path.node.arguments.length
         ) {
           const styledVarName = path?.parentPath?.parent?.id?.name;
-          const styledIdsList = path.parent.arguments
+          const styledIdsList = (path?.parent?.arguments || [])
             .filter((a) => a.type === "Identifier")
             .map((a) => a.name);
           const styledIdsMap = styledIdsList.reduce(
@@ -343,11 +333,35 @@ export default function visitor({ types: t }) {
           node.arguments &&
           node.arguments.length === 1 &&
           t.isStringLiteral(node.arguments[0]);
-        REP.forEach(({ original }) => {
-          if (isRequire && isModule(node.arguments[0].value, original)) {
-            path.node.arguments = [t.stringLiteral("@emotion/css")];
+
+        const requiredPkg = node.arguments[0].value;
+        if (!isRequire || !/^(react-)?emotion$/.test(requiredPkg)) {
+          return;
+        }
+
+        path.node.arguments = [t.stringLiteral("@emotion/css")];
+
+        if (requiredPkg === "react-emotion") {
+          if (path?.parent?.id?.name === STYLED_LOCAL_NAME) {
+            path.node.arguments = [t.stringLiteral("@emotion/styled")];
+            return;
           }
-        });
+
+          if (path?.parentPath?.parentPath?.node?.declarations) {
+            const prevLen = path.parentPath.parentPath.node.declarations.length;
+            const newDeclarationsWithoutStyled =
+              path.parentPath.parentPath.node.declarations.filter(
+                (d) => d.id.name !== STYLED_LOCAL_NAME
+              );
+            const newLen = newDeclarationsWithoutStyled.length;
+            path.parentPath.parentPath.node.declarations =
+              newDeclarationsWithoutStyled;
+            if (newLen < prevLen) {
+              insertEmotionStyled();
+            }
+            return;
+          }
+        }
       },
     },
   };
