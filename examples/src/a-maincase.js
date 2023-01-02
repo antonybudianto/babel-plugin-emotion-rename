@@ -4,10 +4,13 @@
 // import styled from "@emotion/styled";
 // import { css } from "@emotion/react";
 
+/**
+ * Should be @emotion/css + @emotion/styled + @emotion/react
+ */
 import styled, { css, cx } from "react-emotion";
 
 /**
- * Should be kept as is!!!!
+ * Should be kept as is, should be `css`!!!!
  */
 const calonPure = css("background: gray;");
 

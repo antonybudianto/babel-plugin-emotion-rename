@@ -35,10 +35,10 @@ let STYLED_LOCAL_NAME = "styled";
 export default function visitor({ types: t }) {
   let root;
   let filterTags: Tag[] = [];
-  let MAP_STYLED_VARS = {};
-  let MAP_CSS_LIST = {};
-  let ALL_STYLED_NAMES = {};
-  let ALL_CSS_NAMES = {};
+  let MAP_STYLED_VARS: Record<string, number> = {};
+  let MAP_CSS_LIST: Record<string, Tag> = {};
+  let ALL_STYLED_NAMES: Record<string, Record<string, number>> = {};
+  let ALL_CSS_NAMES: Record<string, Record<string, number>> = {};
   let hasEmotionImport = false;
   const emotionStyledImportDeclaration = buildImportEmotionStyled();
   const emotionReactImportDeclaration = buildImportEmotionReact();
@@ -152,7 +152,7 @@ export default function visitor({ types: t }) {
           path.node.body?.tag?.name === CSS_LOCAL_NAME
         ) {
           const cssVarName = path?.parent.id?.name;
-          MAP_CSS_LIST[cssVarName] = { path };
+          MAP_CSS_LIST[cssVarName] = { path, _type: "afne", name: cssVarName };
         }
       },
       FunctionExpression(path) {
@@ -172,7 +172,7 @@ export default function visitor({ types: t }) {
           path.scope.block.body?.body[0]?.argument?.callee?.name ===
           CSS_LOCAL_NAME
         ) {
-          MAP_CSS_LIST[cssVarName] = { path };
+          MAP_CSS_LIST[cssVarName] = { path, _type: "fne", name: cssVarName };
         }
 
         /**
@@ -183,7 +183,7 @@ export default function visitor({ types: t }) {
             "TaggedTemplateExpression" &&
           path.scope.block.body?.body[0]?.argument?.tag?.name === CSS_LOCAL_NAME
         ) {
-          MAP_CSS_LIST[cssVarName] = { path };
+          MAP_CSS_LIST[cssVarName] = { path, _type: "fne", name: cssVarName };
         }
       },
       TaggedTemplateExpression(path) {
@@ -202,7 +202,11 @@ export default function visitor({ types: t }) {
             .map((exp) => exp.name);
           const taggedMap = taggedVars.reduce((a, c) => ({ ...a, [c]: 1 }), {});
 
-          MAP_CSS_LIST[taggedCssVarName] = { path, _type: "tte" };
+          MAP_CSS_LIST[taggedCssVarName] = {
+            path,
+            _type: "tte",
+            name: taggedCssVarName,
+          };
           ALL_CSS_NAMES[taggedCssVarName] = taggedMap;
         } else if (path.node.tag.object?.name === STYLED_LOCAL_NAME) {
           const taggedStyledVars = path.node.quasi.expressions
@@ -354,7 +358,11 @@ export default function visitor({ types: t }) {
             ALL_CSS_NAMES[cssVarName] = cssIdsMap;
           }
           if (path.parent?.id?.type === "Identifier") {
-            MAP_CSS_LIST[path.parent?.id?.name] = { _type: "callee", path };
+            MAP_CSS_LIST[path.parent?.id?.name] = {
+              _type: "callee",
+              path,
+              name: path.parent?.id?.name,
+            };
           }
           return;
         }
