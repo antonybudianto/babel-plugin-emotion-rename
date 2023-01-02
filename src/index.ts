@@ -141,7 +141,6 @@ export default function visitor({ types: t }) {
       },
       ArrowFunctionExpression(path) {
         if (!hasEmotionImport) {
-          path.stop();
           return;
         }
 
@@ -158,7 +157,6 @@ export default function visitor({ types: t }) {
       },
       FunctionExpression(path) {
         if (!hasEmotionImport) {
-          path.stop();
           return;
         }
 
@@ -190,7 +188,6 @@ export default function visitor({ types: t }) {
       },
       TaggedTemplateExpression(path) {
         if (!hasEmotionImport) {
-          path.stop();
           return;
         }
 
@@ -319,9 +316,8 @@ export default function visitor({ types: t }) {
            * We cannot stop until the last require(...) call.
            */
           if (!isRequire) {
-            path.stop();
+            return;
           }
-          return;
         }
 
         /**
