@@ -1,6 +1,6 @@
 {
   "name": "babel-plugin-emotion-rename",
-  "version": "1.0.0-beta.25",
+  "version": "1.0.0-beta.26",
   "description": "Babel plugin to rename old Emotion 9 import to new Emotion 10+ import",
   "main": "lib/index",
   "scripts": {
