@@ -39,6 +39,7 @@ export default function visitor({ types: t }) {
   let MAP_CSS_LIST = {};
   let ALL_STYLED_NAMES = {};
   let ALL_CSS_NAMES = {};
+  let hasEmotionImport = false;
   const emotionStyledImportDeclaration = buildImportEmotionStyled();
   const emotionReactImportDeclaration = buildImportEmotionReact();
 
@@ -139,6 +140,10 @@ export default function visitor({ types: t }) {
         },
       },
       ArrowFunctionExpression(path) {
+        if (!hasEmotionImport) {
+          return;
+        }
+
         /**
          * Collects all emotion `css` calls
          */
@@ -151,6 +156,10 @@ export default function visitor({ types: t }) {
         }
       },
       FunctionExpression(path) {
+        if (!hasEmotionImport) {
+          return;
+        }
+
         /**
          * Collects all emotion `css` calls
          */
@@ -178,6 +187,10 @@ export default function visitor({ types: t }) {
         }
       },
       TaggedTemplateExpression(path) {
+        if (!hasEmotionImport) {
+          return;
+        }
+
         if (path.node?.tag?.name === CSS_LOCAL_NAME) {
           const taggedCssVarName =
             path?.parentPath?.scope?.path?.container?.id?.name;
@@ -216,10 +229,12 @@ export default function visitor({ types: t }) {
         const importPackageName = path.node.source.value;
         if (importPackageName === "emotion") {
           path.node.source = t.stringLiteral("@emotion/css");
+          hasEmotionImport = true;
         } else if (
           importPackageName === "react-emotion" ||
           importPackageName == "emotion"
         ) {
+          hasEmotionImport = true;
           const cssLocalName = path.node.specifiers.find(
             (s) => s.imported?.name === "css"
           )?.local?.name;
@@ -275,6 +290,26 @@ export default function visitor({ types: t }) {
         }
       },
       CallExpression(path) {
+        const { node } = path;
+        const isRequire =
+          node.callee.name === "require" &&
+          node.arguments &&
+          node.arguments.length === 1 &&
+          t.isStringLiteral(node.arguments[0]);
+
+        const requiredPkg = isRequire ? node.arguments[0].value : "";
+
+        if (isRequire && /^(react-)?emotion$/.test(requiredPkg)) {
+          hasEmotionImport = true;
+        }
+
+        /**
+         * Skip files with no emotion/react-emotion import at all
+         */
+        if (!hasEmotionImport) {
+          return;
+        }
+
         /**
          * Collect all styled's arguments with form of styled(a, b, c, ...)
          */
@@ -327,14 +362,6 @@ export default function visitor({ types: t }) {
         /**
          * Handle rename require('emotion') -> require('@emotion/css')
          */
-        const { node } = path;
-        const isRequire =
-          node.callee.name === "require" &&
-          node.arguments &&
-          node.arguments.length === 1 &&
-          t.isStringLiteral(node.arguments[0]);
-
-        const requiredPkg = node.arguments[0].value;
         if (!isRequire || !/^(react-)?emotion$/.test(requiredPkg)) {
           return;
         }
