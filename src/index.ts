@@ -141,6 +141,7 @@ export default function visitor({ types: t }) {
       },
       ArrowFunctionExpression(path) {
         if (!hasEmotionImport) {
+          path.stop();
           return;
         }
 
@@ -157,6 +158,7 @@ export default function visitor({ types: t }) {
       },
       FunctionExpression(path) {
         if (!hasEmotionImport) {
+          path.stop();
           return;
         }
 
@@ -188,6 +190,7 @@ export default function visitor({ types: t }) {
       },
       TaggedTemplateExpression(path) {
         if (!hasEmotionImport) {
+          path.stop();
           return;
         }
 
@@ -311,6 +314,13 @@ export default function visitor({ types: t }) {
          * Skip files with no emotion/react-emotion import at all
          */
         if (!hasEmotionImport) {
+          /**
+           * Prevent late require('emotion') call being stopped before marked as hasEmotionImport.
+           * We cannot stop until the last require(...) call.
+           */
+          if (!isRequire) {
+            path.stop();
+          }
           return;
         }
 
