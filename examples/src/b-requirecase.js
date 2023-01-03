@@ -9,6 +9,9 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.styGrid = exports.styColumn = void 0;
 
+/**
+ * should be "@emotion/css"
+ */
 var _emotion = require("emotion");
 
 const styGrid = (colGutter) =>

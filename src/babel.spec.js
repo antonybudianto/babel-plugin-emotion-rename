@@ -63,11 +63,33 @@ const styled = require("@emotion/styled");
 );
 
 testGeneration(
+  "replace only one css from react-emotion - cjs",
+  `
+const { css } = require("react-emotion");
+`,
+  `
+const {
+  css
+} = require("@emotion/css");`
+);
+
+testGeneration(
+  "replace only one css from emotion - cjs",
+  `
+const { css } = require("emotion");
+`,
+  `
+const {
+  css
+} = require("@emotion/css");`
+);
+
+testGeneration(
   "replace css import to emotion/react if used on styled - case1",
   `
 import styled, { css } from "react-emotion";
 const normalCss = css\`
-  color: #fff; 
+  color: #fff;
 \`;
 
 const BasicStyle = function BasicStyleCmp(props) {
@@ -95,7 +117,7 @@ import { css as css2 } from "@emotion/react";
 import styled from "@emotion/styled";
 import { css } from "@emotion/css";
 const normalCss = css\`
-  color: #fff; 
+  color: #fff;
 \`;
 const BasicStyle = function BasicStyleCmp(props) {
   return css2\`

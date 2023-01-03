@@ -1,11 +1,6 @@
 import templateBuilder from "@babel/template";
 import type { Path, Tag } from "./types";
 
-function isModule(value, original) {
-  const pattern = new RegExp(`^(${original}|${original}/.*)$`);
-  return pattern.test(value);
-}
-
 function getStyled(path: Path) {
   if (
     path.node.source.value !== "react-emotion" &&
@@ -26,7 +21,7 @@ function getStyled(path: Path) {
   return { hasStyled, nonStyled };
 }
 
-const buildImport = templateBuilder(`
+const buildImportEmotionStyled = templateBuilder(`
   import styled from "@emotion/styled";
 `);
 
@@ -37,19 +32,15 @@ const buildImportEmotionReact = templateBuilder(`
 let CSS_LOCAL_NAME = "css";
 let STYLED_LOCAL_NAME = "styled";
 
-const REP = [
-  { replacement: "@emotion/css", original: "emotion" },
-  { replacement: "@emotion/css", original: "react-emotion" },
-];
-
 export default function visitor({ types: t }) {
   let root;
   let filterTags: Tag[] = [];
-  let MAP_STYLED_VARS = {};
-  let MAP_CSS_LIST = {};
-  let ALL_STYLED_NAMES = {};
-  let ALL_CSS_NAMES = {};
-  const emotionStyledImportDeclaration = buildImport();
+  let MAP_STYLED_VARS: Record<string, number> = {};
+  let MAP_CSS_LIST: Record<string, Tag> = {};
+  let ALL_STYLED_NAMES: Record<string, Record<string, number>> = {};
+  let ALL_CSS_NAMES: Record<string, Record<string, number>> = {};
+  let hasEmotionImport = false;
+  const emotionStyledImportDeclaration = buildImportEmotionStyled();
   const emotionReactImportDeclaration = buildImportEmotionReact();
 
   function insertEmotionReact() {
@@ -82,7 +73,7 @@ export default function visitor({ types: t }) {
             if (!ALL_CSS_NAMES[cssName]) {
               return;
             }
-            let cssArgs = Object.keys(ALL_CSS_NAMES[cssName]);
+            const cssArgs = Object.keys(ALL_CSS_NAMES[cssName]);
             if (!cssArgs.length) {
               return;
             }
@@ -149,6 +140,10 @@ export default function visitor({ types: t }) {
         },
       },
       ArrowFunctionExpression(path) {
+        if (!hasEmotionImport) {
+          return;
+        }
+
         /**
          * Collects all emotion `css` calls
          */
@@ -157,10 +152,14 @@ export default function visitor({ types: t }) {
           path.node.body?.tag?.name === CSS_LOCAL_NAME
         ) {
           const cssVarName = path?.parent.id?.name;
-          MAP_CSS_LIST[cssVarName] = { path };
+          MAP_CSS_LIST[cssVarName] = { path, _type: "afne", name: cssVarName };
         }
       },
       FunctionExpression(path) {
+        if (!hasEmotionImport) {
+          return;
+        }
+
         /**
          * Collects all emotion `css` calls
          */
@@ -173,7 +172,7 @@ export default function visitor({ types: t }) {
           path.scope.block.body?.body[0]?.argument?.callee?.name ===
           CSS_LOCAL_NAME
         ) {
-          MAP_CSS_LIST[cssVarName] = { path };
+          MAP_CSS_LIST[cssVarName] = { path, _type: "fne", name: cssVarName };
         }
 
         /**
@@ -184,10 +183,14 @@ export default function visitor({ types: t }) {
             "TaggedTemplateExpression" &&
           path.scope.block.body?.body[0]?.argument?.tag?.name === CSS_LOCAL_NAME
         ) {
-          MAP_CSS_LIST[cssVarName] = { path };
+          MAP_CSS_LIST[cssVarName] = { path, _type: "fne", name: cssVarName };
         }
       },
       TaggedTemplateExpression(path) {
+        if (!hasEmotionImport) {
+          return;
+        }
+
         if (path.node?.tag?.name === CSS_LOCAL_NAME) {
           const taggedCssVarName =
             path?.parentPath?.scope?.path?.container?.id?.name;
@@ -199,7 +202,11 @@ export default function visitor({ types: t }) {
             .map((exp) => exp.name);
           const taggedMap = taggedVars.reduce((a, c) => ({ ...a, [c]: 1 }), {});
 
-          MAP_CSS_LIST[taggedCssVarName] = { path, _type: "tte" };
+          MAP_CSS_LIST[taggedCssVarName] = {
+            path,
+            _type: "tte",
+            name: taggedCssVarName,
+          };
           ALL_CSS_NAMES[taggedCssVarName] = taggedMap;
         } else if (path.node.tag.object?.name === STYLED_LOCAL_NAME) {
           const taggedStyledVars = path.node.quasi.expressions
@@ -226,10 +233,12 @@ export default function visitor({ types: t }) {
         const importPackageName = path.node.source.value;
         if (importPackageName === "emotion") {
           path.node.source = t.stringLiteral("@emotion/css");
+          hasEmotionImport = true;
         } else if (
           importPackageName === "react-emotion" ||
           importPackageName == "emotion"
         ) {
+          hasEmotionImport = true;
           const cssLocalName = path.node.specifiers.find(
             (s) => s.imported?.name === "css"
           )?.local?.name;
@@ -285,6 +294,32 @@ export default function visitor({ types: t }) {
         }
       },
       CallExpression(path) {
+        const { node } = path;
+        const isRequire =
+          node.callee.name === "require" &&
+          node.arguments &&
+          node.arguments.length === 1 &&
+          t.isStringLiteral(node.arguments[0]);
+
+        const requiredPkg = isRequire ? node.arguments[0].value : "";
+
+        if (isRequire && /^(react-)?emotion$/.test(requiredPkg)) {
+          hasEmotionImport = true;
+        }
+
+        /**
+         * Skip files with no emotion/react-emotion import at all
+         */
+        if (!hasEmotionImport) {
+          /**
+           * Prevent late require('emotion') call being stopped before marked as hasEmotionImport.
+           * We cannot stop until the last require(...) call.
+           */
+          if (!isRequire) {
+            return;
+          }
+        }
+
         /**
          * Collect all styled's arguments with form of styled(a, b, c, ...)
          */
@@ -294,7 +329,7 @@ export default function visitor({ types: t }) {
           path.node.arguments.length
         ) {
           const styledVarName = path?.parentPath?.parent?.id?.name;
-          const styledIdsList = path.parent.arguments
+          const styledIdsList = (path?.parent?.arguments || [])
             .filter((a) => a.type === "Identifier")
             .map((a) => a.name);
           const styledIdsMap = styledIdsList.reduce(
@@ -329,7 +364,11 @@ export default function visitor({ types: t }) {
             ALL_CSS_NAMES[cssVarName] = cssIdsMap;
           }
           if (path.parent?.id?.type === "Identifier") {
-            MAP_CSS_LIST[path.parent?.id?.name] = { _type: "callee", path };
+            MAP_CSS_LIST[path.parent?.id?.name] = {
+              _type: "callee",
+              path,
+              name: path.parent?.id?.name,
+            };
           }
           return;
         }
@@ -337,17 +376,33 @@ export default function visitor({ types: t }) {
         /**
          * Handle rename require('emotion') -> require('@emotion/css')
          */
-        const { node } = path;
-        const isRequire =
-          node.callee.name === "require" &&
-          node.arguments &&
-          node.arguments.length === 1 &&
-          t.isStringLiteral(node.arguments[0]);
-        REP.forEach(({ original }) => {
-          if (isRequire && isModule(node.arguments[0].value, original)) {
-            path.node.arguments = [t.stringLiteral("@emotion/css")];
+        if (!isRequire || !/^(react-)?emotion$/.test(requiredPkg)) {
+          return;
+        }
+
+        path.node.arguments = [t.stringLiteral("@emotion/css")];
+
+        if (requiredPkg === "react-emotion") {
+          if (path?.parent?.id?.name === STYLED_LOCAL_NAME) {
+            path.node.arguments = [t.stringLiteral("@emotion/styled")];
+            return;
           }
-        });
+
+          if (path?.parentPath?.parentPath?.node?.declarations) {
+            const prevLen = path.parentPath.parentPath.node.declarations.length;
+            const newDeclarationsWithoutStyled =
+              path.parentPath.parentPath.node.declarations.filter(
+                (d) => d.id.name !== STYLED_LOCAL_NAME
+              );
+            const newLen = newDeclarationsWithoutStyled.length;
+            path.parentPath.parentPath.node.declarations =
+              newDeclarationsWithoutStyled;
+            if (newLen < prevLen) {
+              insertEmotionStyled();
+            }
+            return;
+          }
+        }
       },
     },
   };

@@ -22,6 +22,9 @@ export interface Path {
     };
   };
   node: {
+    tag?: {
+      name: string;
+    };
     callee: {
       name: string;
     };
